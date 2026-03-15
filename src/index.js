@@ -1,3 +1,7 @@
+if (typeof pdfjsLib !== "undefined") {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
 (() => {
   const els = {
     pdfFile: document.getElementById("pdfFile"),
@@ -372,27 +376,76 @@
     URL.revokeObjectURL(url);
   }
 
-  async function handleExtract() {
-    const file = els.pdfFile.files?.[0];
-    if (!file) {
-      setStatus(els.extractStatus, "Choose a PDF first.", true);
-      return;
+ async function handleExtract() {
+  const file = els.pdfFile.files?.[0];
+  if (!file) {
+    setStatus(els.extractStatus, "Choose a PDF first.", true);
+    return;
+  }
+
+  if (typeof pdfjsLib === "undefined") {
+    setStatus(els.extractStatus, "pdf.js failed to load. Check internet/CDN access or script path.", true);
+    return;
+  }
+
+  try {
+    setStatus(els.extractStatus, `Reading PDF: ${file.name} ...`);
+    const text = await extractTextFromPdf(file);
+    state.extractedText = text;
+    state.sentences = splitIntoSentences(text);
+    els.sourceText.value = text;
+    setStatus(
+      els.extractStatus,
+      `PDF extracted successfully.\nCharacters: ${text.length}\nSentences: ${state.sentences.length}`
+    );
+  } catch (err) {
+    setStatus(els.extractStatus, `Failed to extract PDF text: ${err.message || err}`, true);
+  }
+}
+async function loadPdfFromServer() {
+
+  try {
+
+    const url = "/Adventist_Testimony.pdf";
+
+    setStatus(els.extractStatus, "Loading PDF from server...");
+
+    const loadingTask = pdfjsLib.getDocument(url);
+    const pdf = await loadingTask.promise;
+
+    let text = "";
+
+    for (let page = 1; page <= pdf.numPages; page++) {
+
+      const p = await pdf.getPage(page);
+      const content = await p.getTextContent();
+
+      const pageText = content.items.map(i => i.str).join(" ");
+
+      text += pageText + "\n";
+
     }
 
-    try {
-      setStatus(els.extractStatus, "Extracting text from PDF...");
-      const text = await extractTextFromPdf(file);
-      state.extractedText = text;
-      state.sentences = splitIntoSentences(text);
-      els.sourceText.value = text;
-      setStatus(
-        els.extractStatus,
-        `PDF extracted successfully.\nCharacters: ${text.length}\nSentences: ${state.sentences.length}`
-      );
-    } catch (err) {
-      setStatus(els.extractStatus, `Failed to extract PDF text: ${err.message || err}`, true);
-    }
+    state.extractedText = text;
+    state.sentences = splitIntoSentences(text);
+    els.sourceText.value = text;
+
+    setStatus(
+      els.extractStatus,
+      "PDF loaded from server successfully."
+    );
+
+  } catch (err) {
+
+    setStatus(
+      els.extractStatus,
+      "Failed to load server PDF: " + err,
+      true
+    );
+
   }
+
+}
 
   function handleAnalyze() {
     const text = normalizeText(els.sourceText.value);

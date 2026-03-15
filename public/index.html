@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PDF to Crossword Generator</title>
+  <title>Crossword Player</title>
   <style>
     :root {
       --bg: #f4f7fb;
@@ -13,10 +13,13 @@
       --line: #d9e3ee;
       --primary: #0b6bcb;
       --primary-dark: #0857a6;
-      --ok: #177245;
-      --warn: #8a5a00;
+      --active: #b9dbff;
+      --word: #e7f2ff;
+      --cross: #fff2b8;
+      --good: #dff5e6;
+      --bad: #fde8e8;
       --shadow: 0 12px 28px rgba(23, 50, 77, 0.08);
-      --cell: 38px;
+      --cell: 42px;
     }
 
     * { box-sizing: border-box; }
@@ -29,7 +32,7 @@
     }
 
     .wrap {
-      max-width: 1280px;
+      max-width: 1320px;
       margin: 0 auto;
       padding: 24px 16px 40px;
     }
@@ -46,13 +49,11 @@
     .hero h1 {
       margin: 0 0 8px;
       font-size: 34px;
-      line-height: 1.15;
     }
 
     .hero p {
       margin: 0;
       opacity: 0.96;
-      font-size: 16px;
     }
 
     .grid {
@@ -88,39 +89,6 @@
     .stack {
       display: grid;
       gap: 12px;
-    }
-
-    label {
-      display: block;
-      font-size: 14px;
-      font-weight: 700;
-      margin-bottom: 6px;
-    }
-
-    input[type="file"],
-    input[type="number"],
-    textarea,
-    select {
-      width: 100%;
-      padding: 12px 13px;
-      border: 1px solid #c9d7e6;
-      border-radius: 12px;
-      font-size: 15px;
-      background: white;
-      color: var(--text);
-    }
-
-    textarea {
-      min-height: 140px;
-      resize: vertical;
-      font-family: Arial, Helvetica, sans-serif;
-      line-height: 1.4;
-    }
-
-    .row2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
     }
 
     .btn {
@@ -163,7 +131,7 @@
       font-size: 13px;
     }
 
-    .grid-board-wrap {
+    .board-wrap {
       overflow: auto;
       border: 1px solid var(--line);
       border-radius: 16px;
@@ -185,17 +153,40 @@
       width: var(--cell);
       height: var(--cell);
       background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      border: 0;
+      outline: none;
       font-weight: 700;
-      font-size: 18px;
+      font-size: 20px;
       color: #1c3550;
-      user-select: none;
+      text-transform: uppercase;
+      text-align: center;
+      padding: 0;
+      cursor: pointer;
     }
 
     .cell.black {
       background: #20364f;
+      cursor: default;
+    }
+
+    .cell.active {
+      background: var(--active) !important;
+    }
+
+    .cell.word {
+      background: var(--word);
+    }
+
+    .cell.crossword-cross {
+      background: var(--cross);
+    }
+
+    .cell.correct {
+      background: var(--good) !important;
+    }
+
+    .cell.incorrect {
+      background: var(--bad) !important;
     }
 
     .cell-number {
@@ -206,6 +197,7 @@
       font-weight: 700;
       color: #516a85;
       line-height: 1;
+      pointer-events: none;
     }
 
     .clue-columns {
@@ -234,28 +226,26 @@
     .clue-list li {
       margin-bottom: 10px;
       line-height: 1.35;
+      cursor: pointer;
     }
 
-    .word-bank {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+    .clue-list li.active-clue {
+      background: #e7f2ff;
+      border-radius: 8px;
+      padding: 6px 8px;
     }
 
-    .chip {
-      border-radius: 999px;
-      padding: 7px 10px;
-      background: #edf4fb;
-      color: #1d4668;
-      font-size: 13px;
-      font-weight: 700;
-      border: 1px solid #d8e5f3;
+    .current-clue {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: #fbfdff;
+      font-size: 15px;
     }
 
     @media (max-width: 980px) {
       .grid,
-      .clue-columns,
-      .row2 {
+      .clue-columns {
         grid-template-columns: 1fr;
       }
     }
@@ -264,79 +254,39 @@
 <body>
   <div class="wrap">
     <section class="hero">
-      <h1>PDF to Crossword Generator</h1>
-      <p>Upload a PDF, extract the text, and generate a crossword puzzle from the document contents.</p>
+      <h1>Crossword Player</h1>
+      <p>Loads <strong>/crossword.json</strong> from your public website folder.</p>
     </section>
 
     <div class="grid">
       <aside>
         <section class="panel">
-          <div class="panel-header"><h2>1. Upload PDF</h2></div>
+          <div class="panel-header"><h2>Puzzle Controls</h2></div>
           <div class="panel-body">
             <div class="stack">
-              <div>
-                <label for="pdfFile">Choose PDF</label>
-                <input id="pdfFile" type="file" accept="application/pdf" />
-              </div>
-
-              <div class="row2">
-                <div>
-                  <label for="gridSize">Grid Size</label>
-                  <input id="gridSize" type="number" min="10" max="30" value="15" />
-                </div>
-                <div>
-                  <label for="wordCount">Max Words</label>
-                  <input id="wordCount" type="number" min="5" max="30" value="12" />
-                </div>
-              </div>
-
-              <button id="extractBtn" class="btn btn-primary">Extract Text from PDF</button>
-              <div id="extractStatus" class="status">Waiting for PDF upload.</div>
+              <button id="loadPuzzleBtn" class="btn btn-primary">Load crossword.json</button>
+              <button id="toggleDirectionBtn" class="btn btn-secondary">Toggle Direction</button>
+              <button id="checkBtn" class="btn btn-secondary">Check Answers</button>
+              <button id="clearMarksBtn" class="btn btn-secondary">Clear Check Marks</button>
+              <button id="revealBtn" class="btn btn-secondary">Reveal Puzzle</button>
+              <div id="status" class="status">Waiting to load /crossword.json</div>
             </div>
           </div>
         </section>
 
         <section class="panel">
-          <div class="panel-header"><h2>2. Source Text</h2></div>
+          <div class="panel-header"><h2>Current Clue</h2></div>
           <div class="panel-body">
-            <div class="stack">
-              <div>
-                <label for="sourceText">Extracted / Editable Text</label>
-                <textarea id="sourceText" placeholder="PDF text will appear here..."></textarea>
-              </div>
-              <button id="analyzeBtn" class="btn btn-secondary">Analyze Words</button>
-              <div id="analysisStatus" class="status">No analysis yet.</div>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header"><h2>3. Generate Puzzle</h2></div>
-          <div class="panel-body">
-            <div class="stack">
-              <button id="generateBtn" class="btn btn-primary">Generate Crossword</button>
-              <button id="downloadBtn" class="btn btn-secondary">Download Puzzle Summary</button>
-              <div id="generateStatus" class="status">No puzzle generated yet.</div>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header"><h2>Candidate Words</h2></div>
-          <div class="panel-body">
-            <div id="wordBank" class="word-bank"></div>
-            <div class="muted" style="margin-top:10px;">
-              Words are selected automatically from the PDF text. Short common words are filtered out.
-            </div>
+            <div id="currentClue" class="current-clue">No clue selected.</div>
           </div>
         </section>
       </aside>
 
       <main>
         <section class="panel">
-          <div class="panel-header"><h2>Crossword Grid</h2></div>
+          <div class="panel-header"><h2>Crossword Board</h2></div>
           <div class="panel-body">
-            <div class="grid-board-wrap">
+            <div class="board-wrap">
               <div id="crosswordGrid" class="crossword-grid"></div>
             </div>
           </div>
@@ -361,7 +311,631 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.5.136/pdf.min.js"></script>
-  <script src="/index.js"></script>
+  <script>
+    const state = {
+      puzzle: null,
+      selected: null,
+      direction: "across",
+      userGrid: []
+    };
+
+    function $(id) {
+      return document.getElementById(id);
+    }
+
+    function setStatus(text, isError = false) {
+      const el = $("status");
+      el.textContent = text;
+      el.style.color = isError ? "#a12626" : "";
+    }
+
+    function buildPlacementCells(p) {
+      const cells = [];
+      for (let i = 0; i < p.answer.length; i++) {
+        cells.push({
+          row: p.row + (p.dir === "down" ? i : 0),
+          col: p.col + (p.dir === "across" ? i : 0)
+        });
+      }
+      return cells;
+    }
+
+    function buildUserGrid(grid) {
+      return grid.map(row => row.map(cell => (cell === null ? null : "")));
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function createPuzzleFromJson(data) {
+  let words = [];
+
+  if (Array.isArray(data.words)) {
+    words = data.words
+      .map((w, i) => ({
+        number: i + 1,
+        clue: `Word from the puzzle (${String(w).length})`,
+        answer: String(w || "").toUpperCase(),
+        dir: i % 2 === 0 ? "across" : "down"
+      }))
+      .filter(w => w.answer.length >= 2);
+  } else if (Array.isArray(data.across) || Array.isArray(data.down)) {
+    for (const item of (data.across || [])) {
+      words.push({
+        number: Number(item.number),
+        clue: item.clue || `Across clue (${String(item.answer || "").length})`,
+        answer: String(item.answer || "").toUpperCase(),
+        dir: "across"
+      });
+    }
+
+    for (const item of (data.down || [])) {
+      words.push({
+        number: Number(item.number),
+        clue: item.clue || `Down clue (${String(item.answer || "").length})`,
+        answer: String(item.answer || "").toUpperCase(),
+        dir: "down"
+      });
+    }
+  } else {
+    throw new Error("crossword.json must contain words[] or across[] / down[]");
+  }
+
+  const size = 24;
+  const grid = Array.from({ length: size }, () => Array.from({ length: size }, () => null));
+  const placements = [];
+
+  function inBounds(r, c) {
+    return r >= 0 && c >= 0 && r < size && c < size;
+  }
+
+  function canPlace(word, row, col, dir) {
+    const dr = dir === "down" ? 1 : 0;
+    const dc = dir === "across" ? 1 : 0;
+
+    for (let i = 0; i < word.length; i++) {
+      const r = row + dr * i;
+      const c = col + dc * i;
+      if (!inBounds(r, c)) return false;
+      const existing = grid[r][c];
+      if (existing !== null && existing !== word[i]) return false;
+    }
+    return true;
+  }
+
+  function place(entry, row, col) {
+    const dr = entry.dir === "down" ? 1 : 0;
+    const dc = entry.dir === "across" ? 1 : 0;
+
+    for (let i = 0; i < entry.answer.length; i++) {
+      grid[row + dr * i][col + dc * i] = entry.answer[i];
+    }
+
+    placements.push({ ...entry, row, col });
+  }
+
+  const sorted = [...words].sort((a, b) => b.answer.length - a.answer.length);
+
+  if (sorted.length) {
+    const first = sorted[0];
+    const row = Math.floor(size / 2);
+    const col = Math.max(0, Math.floor((size - first.answer.length) / 2));
+    place(first, row, col);
+  }
+
+  for (let wi = 1; wi < sorted.length; wi++) {
+    const word = sorted[wi];
+    let done = false;
+
+    for (const p of placements) {
+      for (let i = 0; i < p.answer.length; i++) {
+        for (let j = 0; j < word.answer.length; j++) {
+          if (p.answer[i] !== word.answer[j]) continue;
+
+          let row, col;
+          if (p.dir === "across" && word.dir === "down") {
+            row = p.row - j;
+            col = p.col + i;
+          } else if (p.dir === "down" && word.dir === "across") {
+            row = p.row + i;
+            col = p.col - j;
+          } else {
+            continue;
+          }
+
+          if (canPlace(word.answer, row, col, word.dir)) {
+            place(word, row, col);
+            done = true;
+            break;
+          }
+        }
+        if (done) break;
+      }
+      if (done) break;
+    }
+
+    if (!done) {
+      outer:
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (canPlace(word.answer, r, c, word.dir)) {
+            place(word, r, c);
+            break outer;
+          }
+        }
+      }
+    }
+  }
+
+  let minR = size, minC = size, maxR = 0, maxC = 0;
+  for (const p of placements) {
+    for (let i = 0; i < p.answer.length; i++) {
+      const r = p.row + (p.dir === "down" ? i : 0);
+      const c = p.col + (p.dir === "across" ? i : 0);
+      minR = Math.min(minR, r);
+      minC = Math.min(minC, c);
+      maxR = Math.max(maxR, r);
+      maxC = Math.max(maxC, c);
+    }
+  }
+
+  const trimmedGrid = [];
+  for (let r = minR; r <= maxR; r++) {
+    const row = [];
+    for (let c = minC; c <= maxC; c++) {
+      row.push(grid[r][c]);
+    }
+    trimmedGrid.push(row);
+  }
+
+  const trimmedPlacements = placements.map(p => ({
+    ...p,
+    row: p.row - minR,
+    col: p.col - minC
+  }));
+
+  const numberMap = new Map();
+  let n = 1;
+  const sortedStarts = [...trimmedPlacements].sort((a, b) => {
+    if (a.row !== b.row) return a.row - b.row;
+    return a.col - b.col;
+  });
+
+  for (const p of sortedStarts) {
+    const key = `${p.row},${p.col}`;
+    if (!numberMap.has(key)) numberMap.set(key, n++);
+    p.displayNumber = numberMap.get(key);
+  }
+
+  return {
+    grid: trimmedGrid,
+    placements: trimmedPlacements,
+    across: trimmedPlacements.filter(p => p.dir === "across"),
+    down: trimmedPlacements.filter(p => p.dir === "down")
+  };
+}
+
+      const size = 24;
+      const grid = Array.from({ length: size }, () => Array.from({ length: size }, () => null));
+      const placements = [];
+
+      function inBounds(r, c) {
+        return r >= 0 && c >= 0 && r < size && c < size;
+      }
+
+      function canPlace(word, row, col, dir) {
+        const dr = dir === "down" ? 1 : 0;
+        const dc = dir === "across" ? 1 : 0;
+
+        for (let i = 0; i < word.length; i++) {
+          const r = row + dr * i;
+          const c = col + dc * i;
+          if (!inBounds(r, c)) return false;
+          const existing = grid[r][c];
+          if (existing !== null && existing !== word[i]) return false;
+        }
+        return true;
+      }
+
+      function place(entry, row, col) {
+        const dr = entry.dir === "down" ? 1 : 0;
+        const dc = entry.dir === "across" ? 1 : 0;
+
+        for (let i = 0; i < entry.answer.length; i++) {
+          grid[row + dr * i][col + dc * i] = entry.answer[i];
+        }
+
+        placements.push({ ...entry, row, col });
+      }
+
+      const sorted = [...words].sort((a, b) => b.answer.length - a.answer.length);
+
+      if (sorted.length) {
+        const first = sorted[0];
+        const row = Math.floor(size / 2);
+        const col = Math.max(0, Math.floor((size - first.answer.length) / 2));
+        place(first, row, col);
+      }
+
+      for (let wi = 1; wi < sorted.length; wi++) {
+        const word = sorted[wi];
+        let done = false;
+
+        for (const p of placements) {
+          for (let i = 0; i < p.answer.length; i++) {
+            for (let j = 0; j < word.answer.length; j++) {
+              if (p.answer[i] !== word.answer[j]) continue;
+
+              let row, col;
+              if (p.dir === "across" && word.dir === "down") {
+                row = p.row - j;
+                col = p.col + i;
+              } else if (p.dir === "down" && word.dir === "across") {
+                row = p.row + i;
+                col = p.col - j;
+              } else {
+                continue;
+              }
+
+              if (canPlace(word.answer, row, col, word.dir)) {
+                place(word, row, col);
+                done = true;
+                break;
+              }
+            }
+            if (done) break;
+          }
+          if (done) break;
+        }
+
+        if (!done) {
+          outer:
+          for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+              if (canPlace(word.answer, r, c, word.dir)) {
+                place(word, r, c);
+                break outer;
+              }
+            }
+          }
+        }
+      }
+
+      let minR = size, minC = size, maxR = 0, maxC = 0;
+      for (const p of placements) {
+        for (const cell of buildPlacementCells(p)) {
+          minR = Math.min(minR, cell.row);
+          minC = Math.min(minC, cell.col);
+          maxR = Math.max(maxR, cell.row);
+          maxC = Math.max(maxC, cell.col);
+        }
+      }
+
+      const trimmedGrid = [];
+      for (let r = minR; r <= maxR; r++) {
+        const row = [];
+        for (let c = minC; c <= maxC; c++) {
+          row.push(grid[r][c]);
+        }
+        trimmedGrid.push(row);
+      }
+
+      const trimmedPlacements = placements.map(p => ({
+        ...p,
+        row: p.row - minR,
+        col: p.col - minC
+      }));
+
+      const numberMap = new Map();
+      let n = 1;
+      const sortedStarts = [...trimmedPlacements].sort((a, b) => {
+        if (a.row !== b.row) return a.row - b.row;
+        return a.col - b.col;
+      });
+
+      for (const p of sortedStarts) {
+        const key = `${p.row},${p.col}`;
+        if (!numberMap.has(key)) numberMap.set(key, n++);
+        p.displayNumber = numberMap.get(key);
+      }
+
+      return {
+        grid: trimmedGrid,
+        placements: trimmedPlacements,
+        across: trimmedPlacements.filter(p => p.dir === "across"),
+        down: trimmedPlacements.filter(p => p.dir === "down")
+      };
+    }
+
+    function getWordsAtCell(row, col) {
+      return state.puzzle.placements.filter(p =>
+        buildPlacementCells(p).some(c => c.row === row && c.col === col)
+      );
+    }
+
+    function getCellsForWord(word) {
+      return buildPlacementCells(word);
+    }
+
+    function renderClues() {
+      $("acrossClues").innerHTML = state.puzzle.across.map(c =>
+        `<li data-dir="across" data-number="${c.number}"><strong>${c.number}.</strong> ${escapeHtml(c.clue)} <span class="muted">(${c.answer.length})</span></li>`
+      ).join("");
+
+      $("downClues").innerHTML = state.puzzle.down.map(c =>
+        `<li data-dir="down" data-number="${c.number}"><strong>${c.number}.</strong> ${escapeHtml(c.clue)} <span class="muted">(${c.answer.length})</span></li>`
+      ).join("");
+
+      document.querySelectorAll(".clue-list li").forEach(li => {
+        li.addEventListener("click", () => {
+          const dir = li.dataset.dir;
+          const number = Number(li.dataset.number);
+          const word = state.puzzle.placements.find(p => p.dir === dir && p.number === number);
+          if (!word) return;
+          state.direction = dir;
+          selectCell(word.row, word.col);
+        });
+      });
+    }
+
+    function rebuildGrid() {
+      const gridEl = $("crosswordGrid");
+      const rows = state.puzzle.grid.length;
+      const cols = rows ? state.puzzle.grid[0].length : 0;
+
+      gridEl.innerHTML = "";
+      gridEl.style.gridTemplateColumns = `repeat(${cols}, 42px)`;
+
+      const startMap = new Map();
+      for (const p of state.puzzle.placements) {
+        startMap.set(`${p.row},${p.col}`, p.displayNumber);
+      }
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const answer = state.puzzle.grid[r][c];
+          if (answer === null) {
+            const black = document.createElement("div");
+            black.className = "cell black";
+            gridEl.appendChild(black);
+            continue;
+          }
+
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "cell";
+          btn.dataset.row = r;
+          btn.dataset.col = c;
+
+          const num = startMap.get(`${r},${c}`);
+          if (num) {
+            const n = document.createElement("div");
+            n.className = "cell-number";
+            n.textContent = num;
+            btn.appendChild(n);
+          }
+
+          btn.appendChild(document.createTextNode(state.userGrid[r][c] || ""));
+          btn.addEventListener("click", () => selectCell(r, c));
+          gridEl.appendChild(btn);
+        }
+      }
+    }
+
+    function updateHighlighting() {
+      rebuildGrid();
+
+      if (!state.selected) {
+        $("currentClue").textContent = "No clue selected.";
+        return;
+      }
+
+      const activeWord = state.selected.word;
+      const activeCells = new Set(getCellsForWord(activeWord).map(c => `${c.row},${c.col}`));
+
+      document.querySelectorAll("#crosswordGrid .cell").forEach(cell => {
+        const row = cell.dataset.row;
+        const col = cell.dataset.col;
+        if (row == null || col == null) return;
+
+        const key = `${row},${col}`;
+        if (activeCells.has(key)) cell.classList.add("word");
+        if (Number(row) === state.selected.row && Number(col) === state.selected.col) {
+          cell.classList.add("active");
+        }
+
+        const wordsHere = getWordsAtCell(Number(row), Number(col));
+        if (wordsHere.length > 1) cell.classList.add("crossword-cross");
+      });
+
+      document.querySelectorAll(".clue-list li").forEach(li => li.classList.remove("active-clue"));
+      const activeLi = document.querySelector(`.clue-list li[data-dir="${activeWord.dir}"][data-number="${activeWord.number}"]`);
+      if (activeLi) activeLi.classList.add("active-clue");
+
+      $("currentClue").textContent =
+        `${activeWord.dir.toUpperCase()} ${activeWord.number}: ${activeWord.clue} (${activeWord.answer.length})`;
+    }
+
+    function selectCell(row, col) {
+      const words = getWordsAtCell(row, col);
+      if (!words.length) return;
+
+      const match = words.find(w => w.dir === state.direction) || words[0];
+      state.direction = match.dir;
+      state.selected = { row, col, word: match };
+      updateHighlighting();
+    }
+
+    function moveToCell(row, col) {
+      if (
+        row < 0 || col < 0 ||
+        row >= state.puzzle.grid.length ||
+        col >= state.puzzle.grid[0].length ||
+        state.puzzle.grid[row][col] === null
+      ) return;
+      selectCell(row, col);
+    }
+
+    function moveNext() {
+      const cells = getCellsForWord(state.selected.word);
+      const idx = cells.findIndex(c => c.row === state.selected.row && c.col === state.selected.col);
+      if (idx >= 0 && idx < cells.length - 1) {
+        selectCell(cells[idx + 1].row, cells[idx + 1].col);
+      }
+    }
+
+    function movePrev() {
+      const cells = getCellsForWord(state.selected.word);
+      const idx = cells.findIndex(c => c.row === state.selected.row && c.col === state.selected.col);
+      if (idx > 0) {
+        selectCell(cells[idx - 1].row, cells[idx - 1].col);
+      }
+    }
+
+    function writeLetter(letter) {
+      state.userGrid[state.selected.row][state.selected.col] = letter;
+      moveNext();
+      updateHighlighting();
+    }
+
+    function backspaceLetter() {
+      const row = state.selected.row;
+      const col = state.selected.col;
+
+      if (state.userGrid[row][col]) {
+        state.userGrid[row][col] = "";
+      } else {
+        movePrev();
+        state.userGrid[state.selected.row][state.selected.col] = "";
+      }
+      updateHighlighting();
+    }
+
+    function toggleDirection() {
+      state.direction = state.direction === "across" ? "down" : "across";
+      if (state.selected) {
+        const words = getWordsAtCell(state.selected.row, state.selected.col);
+        const nextWord = words.find(w => w.dir === state.direction);
+        if (nextWord) state.selected.word = nextWord;
+      }
+      updateHighlighting();
+      setStatus(`Direction: ${state.direction}`);
+    }
+
+    function checkAnswers() {
+      document.querySelectorAll("#crosswordGrid .cell").forEach(cell => {
+        cell.classList.remove("correct", "incorrect");
+        const row = cell.dataset.row;
+        const col = cell.dataset.col;
+        if (row == null || col == null) return;
+
+        const r = Number(row);
+        const c = Number(col);
+        const actual = state.userGrid[r][c] || "";
+        const expected = state.puzzle.grid[r][c];
+        if (!actual) return;
+
+        if (actual === expected) cell.classList.add("correct");
+        else cell.classList.add("incorrect");
+      });
+
+      setStatus("Checked answers.");
+    }
+
+    function clearMarks() {
+      document.querySelectorAll("#crosswordGrid .cell").forEach(cell => {
+        cell.classList.remove("correct", "incorrect");
+      });
+      setStatus("Check marks cleared.");
+    }
+
+    function revealPuzzle() {
+      for (let r = 0; r < state.puzzle.grid.length; r++) {
+        for (let c = 0; c < state.puzzle.grid[0].length; c++) {
+          if (state.puzzle.grid[r][c] !== null) {
+            state.userGrid[r][c] = state.puzzle.grid[r][c];
+          }
+        }
+      }
+      updateHighlighting();
+      setStatus("Puzzle revealed.");
+    }
+
+    async function loadPuzzle() {
+      try {
+        setStatus("Loading /crossword.json ...");
+        const res = await fetch("/crossword.json", { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        state.puzzle = createPuzzleFromJson(data);
+        state.userGrid = buildUserGrid(state.puzzle.grid);
+
+        renderClues();
+        rebuildGrid();
+
+        if (state.puzzle.placements.length) {
+          const first = state.puzzle.placements[0];
+          state.direction = first.dir;
+          selectCell(first.row, first.col);
+        }
+
+        setStatus("Puzzle loaded.");
+      } catch (err) {
+        setStatus(`Failed to load puzzle: ${err.message}`, true);
+      }
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (!state.selected) return;
+
+      if (/^[a-zA-Z]$/.test(e.key)) {
+        e.preventDefault();
+        writeLetter(e.key.toUpperCase());
+        return;
+      }
+
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        backspaceLetter();
+        return;
+      }
+
+      if (e.key === " ") {
+        e.preventDefault();
+        toggleDirection();
+        return;
+      }
+
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        moveToCell(state.selected.row, state.selected.col + 1);
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        moveToCell(state.selected.row, state.selected.col - 1);
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        moveToCell(state.selected.row - 1, state.selected.col);
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        moveToCell(state.selected.row + 1, state.selected.col);
+      }
+    });
+
+    $("loadPuzzleBtn").addEventListener("click", loadPuzzle);
+    $("toggleDirectionBtn").addEventListener("click", toggleDirection);
+    $("checkBtn").addEventListener("click", checkAnswers);
+    $("clearMarksBtn").addEventListener("click", clearMarks);
+    $("revealBtn").addEventListener("click", revealPuzzle);
+  </script>
 </body>
 </html>

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF to Crossword Generator</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #17324d;
+      --muted: #5b7188;
+      --line: #d9e3ee;
+      --primary: #0b6bcb;
+      --primary-dark: #0857a6;
+      --ok: #177245;
+      --warn: #8a5a00;
+      --shadow: 0 12px 28px rgba(23, 50, 77, 0.08);
+      --cell: 38px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .wrap {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #0b6bcb, #0d84b8);
+      color: white;
+      border-radius: 24px;
+      padding: 28px 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+      line-height: 1.15;
+    }
+
+    .hero p {
+      margin: 0;
+      opacity: 0.96;
+      font-size: 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+
+    .panel-header {
+      padding: 18px 18px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 21px;
+    }
+
+    .panel-body {
+      padding: 18px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    input[type="file"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px 13px;
+      border: 1px solid #c9d7e6;
+      border-radius: 12px;
+      font-size: 15px;
+      background: white;
+      color: var(--text);
+    }
+
+    textarea {
+      min-height: 140px;
+      resize: vertical;
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.4;
+    }
+
+    .row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 15px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-secondary {
+      background: #edf4fb;
+      color: var(--text);
+      border: 1px solid #d8e5f3;
+    }
+
+    .status {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: #fbfdff;
+      font-size: 14px;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .grid-board-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: #fbfdff;
+    }
+
+    .crossword-grid {
+      display: grid;
+      gap: 2px;
+      width: max-content;
+      background: #cdd9e8;
+      padding: 2px;
+      border-radius: 8px;
+    }
+
+    .cell {
+      position: relative;
+      width: var(--cell);
+      height: var(--cell);
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 18px;
+      color: #1c3550;
+      user-select: none;
+    }
+
+    .cell.black {
+      background: #20364f;
+    }
+
+    .cell-number {
+      position: absolute;
+      top: 2px;
+      left: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #516a85;
+      line-height: 1;
+    }
+
+    .clue-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .clue-box {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: #fbfdff;
+    }
+
+    .clue-box h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+    }
+
+    .clue-list {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .clue-list li {
+      margin-bottom: 10px;
+      line-height: 1.35;
+    }
+
+    .word-bank {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 7px 10px;
+      background: #edf4fb;
+      color: #1d4668;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid #d8e5f3;
+    }
+
+    @media (max-width: 980px) {
+      .grid,
+      .clue-columns,
+      .row2 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>PDF to Crossword Generator</h1>
+      <p>Upload a PDF, extract the text, and generate a crossword puzzle from the document contents.</p>
+    </section>
+
+    <div class="grid">
+      <aside>
+        <section class="panel">
+          <div class="panel-header"><h2>1. Upload PDF</h2></div>
+          <div class="panel-body">
+            <div class="stack">
+              <div>
+                <label for="pdfFile">Choose PDF</label>
+                <input id="pdfFile" type="file" accept="application/pdf" />
+              </div>
+
+              <div class="row2">
+                <div>
+                  <label for="gridSize">Grid Size</label>
+                  <input id="gridSize" type="number" min="10" max="30" value="15" />
+                </div>
+                <div>
+                  <label for="wordCount">Max Words</label>
+                  <input id="wordCount" type="number" min="5" max="30" value="12" />
+                </div>
+              </div>
+
+              <button id="extractBtn" class="btn btn-primary">Extract Text from PDF</button>
+              <button id="loadServerPdf" class="btn btn-secondary">Load Adventist_Testimony.pdf</button>
+              <div id="extractStatus" class="status">Waiting for PDF upload.</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header"><h2>2. Source Text</h2></div>
+          <div class="panel-body">
+            <div class="stack">
+              <div>
+                <label for="sourceText">Extracted / Editable Text</label>
+                <textarea id="sourceText" placeholder="PDF text will appear here..."></textarea>
+              </div>
+              <button id="analyzeBtn" class="btn btn-secondary">Analyze Words</button>
+              <div id="analysisStatus" class="status">No analysis yet.</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header"><h2>3. Generate Puzzle</h2></div>
+          <div class="panel-body">
+            <div class="stack">
+              <button id="generateBtn" class="btn btn-primary">Generate Crossword</button>
+              <button id="downloadBtn" class="btn btn-secondary">Download Puzzle Summary</button>
+              <div id="generateStatus" class="status">No puzzle generated yet.</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header"><h2>Candidate Words</h2></div>
+          <div class="panel-body">
+            <div id="wordBank" class="word-bank"></div>
+            <div class="muted" style="margin-top:10px;">
+              Words are selected automatically from the PDF text. Short common words are filtered out.
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <main>
+        <section class="panel">
+          <div class="panel-header"><h2>Crossword Grid</h2></div>
+          <div class="panel-body">
+            <div class="grid-board-wrap">
+              <div id="crosswordGrid" class="crossword-grid"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header"><h2>Clues</h2></div>
+          <div class="panel-body">
+            <div class="clue-columns">
+              <div class="clue-box">
+                <h3>Across</h3>
+                <ol id="acrossClues" class="clue-list"></ol>
+              </div>
+              <div class="clue-box">
+                <h3>Down</h3>
+                <ol id="downClues" class="clue-list"></ol>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener("error", function (e) {
+      const status = document.getElementById("extractStatus");
+      if (status) {
+        status.textContent = "JavaScript error: " + e.message;
+        status.style.color = "#a12626";
+      }
+    });
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.5.136/pdf.min.js"></script>
+  <script src="/src/index.js"></script>
+</body>
+</html>
