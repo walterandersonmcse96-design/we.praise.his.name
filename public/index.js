@@ -1,3 +1,12 @@
+function escapeHtml(str) {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 if (typeof pdfjsLib !== "undefined") {
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -86,7 +95,15 @@ function buildClue(word) {
   const sentence = state.sentences.find(s => s.toUpperCase().includes(word));
   if (!sentence) return `Document word (${word.length} letters)`;
 
-  const masked = sentence.replace(new RegExp(word, "ig"), "_".repeat(word.length));
+  // Use word-boundary safe replacement and ensure the masked word is
+  // surrounded by spaces so it's easy to spot in the hint sentence.
+  function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  const pattern = new RegExp("\\b" + escapeRegExp(word) + "\\b", "ig");
+  const replacement = " " + "_".repeat(word.length) + " ";
+  const masked = sentence.replace(pattern, replacement);
   return cleanClueText(masked);
 }
 
