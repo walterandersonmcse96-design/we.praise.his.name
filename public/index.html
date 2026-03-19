@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,7 +20,6 @@
       --good: #dff5e6;
       --bad: #fde8e8;
       --shadow: 0 12px 28px rgba(23, 50, 77, 0.08);
-      --cell: 42px;
     }
 
     * { box-sizing: border-box; }
@@ -91,6 +91,25 @@
       gap: 12px;
     }
 
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px 13px;
+      border: 1px solid #c9d7e6;
+      border-radius: 12px;
+      font-size: 15px;
+      background: white;
+      color: var(--text);
+    }
+
     .btn {
       appearance: none;
       border: 0;
@@ -150,18 +169,26 @@
 
     .cell {
       position: relative;
-      width: var(--cell);
-      height: var(--cell);
       background: white;
       border: 0;
       outline: none;
       font-weight: 700;
-      font-size: 20px;
       color: #1c3550;
       text-transform: uppercase;
       text-align: center;
       padding: 0;
-      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      user-select: none;
+      -webkit-appearance: none;
+      appearance: none;
+      border-radius: 0;
+    }
+
+    input.cell {
+      cursor: text;
     }
 
     .cell.black {
@@ -198,6 +225,7 @@
       color: #516a85;
       line-height: 1;
       pointer-events: none;
+      z-index: 2;
     }
 
     .clue-columns {
@@ -241,6 +269,8 @@
       padding: 12px 14px;
       background: #fbfdff;
       font-size: 15px;
+      max-height: 240px;
+      overflow: auto;
     }
 
     @media (max-width: 980px) {
@@ -264,6 +294,25 @@
           <div class="panel-header"><h2>Puzzle Controls</h2></div>
           <div class="panel-body">
             <div class="stack">
+              <div>
+                <label for="boardSize">Board Size</label>
+                <select id="boardSize">
+                  <option value="25" selected>25 x 25</option>
+                  <option value="50">50 x 50</option>
+                  <option value="75">75 x 75</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="wordCount">Word Count</label>
+                <select id="wordCount">
+                  <option value="12">12</option>
+                  <option value="25" selected>25</option>
+                  <option value="35">35</option>
+                  <option value="50">50</option>
+                </select>
+              </div>
+
               <button id="loadPuzzleBtn" class="btn btn-primary">Load crossword.json</button>
               <button id="toggleDirectionBtn" class="btn btn-secondary">Toggle Direction</button>
               <button id="checkBtn" class="btn btn-secondary">Check Answers</button>
@@ -277,7 +326,7 @@
         <section class="panel">
           <div class="panel-header"><h2>Current Clue</h2></div>
           <div class="panel-body">
-            <div id="currentClue" class="current-clue">No clue selected.</div>
+            <div id="currentClue" class="currentClue current-clue">No clue selected.</div>
           </div>
         </section>
       </aside>
@@ -329,21 +378,6 @@
       el.style.color = isError ? "#a12626" : "";
     }
 
-    function buildPlacementCells(p) {
-      const cells = [];
-      for (let i = 0; i < p.answer.length; i++) {
-        cells.push({
-          row: p.row + (p.dir === "down" ? i : 0),
-          col: p.col + (p.dir === "across" ? i : 0)
-        });
-      }
-      return cells;
-    }
-
-    function buildUserGrid(grid) {
-      return grid.map(row => row.map(cell => (cell === null ? null : "")));
-    }
-
     function escapeHtml(value) {
       return String(value ?? "")
         .replace(/&/g, "&amp;")
@@ -353,314 +387,122 @@
         .replace(/'/g, "&#39;");
     }
 
-    function createPuzzleFromJson(data) {
-  let words = [];
-
-  if (Array.isArray(data.words)) {
-    words = data.words
-      .map((w, i) => ({
-        number: i + 1,
-        clue: `Word from the puzzle (${String(w).length})`,
-        answer: String(w || "").toUpperCase(),
-        dir: i % 2 === 0 ? "across" : "down"
-      }))
-      .filter(w => w.answer.length >= 2);
-  } else if (Array.isArray(data.across) || Array.isArray(data.down)) {
-    for (const item of (data.across || [])) {
-      words.push({
-        number: Number(item.number),
-        clue: item.clue || `Across clue (${String(item.answer || "").length})`,
-        answer: String(item.answer || "").toUpperCase(),
-        dir: "across"
-      });
+    function getRequestedWordLimit() {
+      return parseInt($("wordCount").value, 10) || 25;
     }
 
-    for (const item of (data.down || [])) {
-      words.push({
-        number: Number(item.number),
-        clue: item.clue || `Down clue (${String(item.answer || "").length})`,
-        answer: String(item.answer || "").toUpperCase(),
-        dir: "down"
-      });
-    }
-  } else {
-    throw new Error("crossword.json must contain words[] or across[] / down[]");
-  }
-
-  const size = 24;
-  const grid = Array.from({ length: size }, () => Array.from({ length: size }, () => null));
-  const placements = [];
-
-  function inBounds(r, c) {
-    return r >= 0 && c >= 0 && r < size && c < size;
-  }
-
-  function canPlace(word, row, col, dir) {
-    const dr = dir === "down" ? 1 : 0;
-    const dc = dir === "across" ? 1 : 0;
-
-    for (let i = 0; i < word.length; i++) {
-      const r = row + dr * i;
-      const c = col + dc * i;
-      if (!inBounds(r, c)) return false;
-      const existing = grid[r][c];
-      if (existing !== null && existing !== word[i]) return false;
-    }
-    return true;
-  }
-
-  function place(entry, row, col) {
-    const dr = entry.dir === "down" ? 1 : 0;
-    const dc = entry.dir === "across" ? 1 : 0;
-
-    for (let i = 0; i < entry.answer.length; i++) {
-      grid[row + dr * i][col + dc * i] = entry.answer[i];
+    function getRequestedBoardSize() {
+      return parseInt($("boardSize").value, 10) || 25;
     }
 
-    placements.push({ ...entry, row, col });
-  }
+    function getCellSize(size) {
+      if (size >= 75) return 12;
+      if (size >= 50) return 18;
+      if (size >= 25) return 28;
+      return 38;
+    }
 
-  const sorted = [...words].sort((a, b) => b.answer.length - a.answer.length);
-
-  if (sorted.length) {
-    const first = sorted[0];
-    const row = Math.floor(size / 2);
-    const col = Math.max(0, Math.floor((size - first.answer.length) / 2));
-    place(first, row, col);
-  }
-
-  for (let wi = 1; wi < sorted.length; wi++) {
-    const word = sorted[wi];
-    let done = false;
-
-    for (const p of placements) {
-      for (let i = 0; i < p.answer.length; i++) {
-        for (let j = 0; j < word.answer.length; j++) {
-          if (p.answer[i] !== word.answer[j]) continue;
-
-          let row, col;
-          if (p.dir === "across" && word.dir === "down") {
-            row = p.row - j;
-            col = p.col + i;
-          } else if (p.dir === "down" && word.dir === "across") {
-            row = p.row + i;
-            col = p.col - j;
-          } else {
-            continue;
-          }
-
-          if (canPlace(word.answer, row, col, word.dir)) {
-            place(word, row, col);
-            done = true;
-            break;
-          }
-        }
-        if (done) break;
+    function buildCellsForWord(word) {
+      const cells = [];
+      const dir = word.direction || word.dir;
+      for (let i = 0; i < word.answer.length; i++) {
+        cells.push({
+          row: word.row + (dir === "down" ? i : 0),
+          col: word.col + (dir === "across" ? i : 0)
+        });
       }
-      if (done) break;
+      return cells;
     }
 
-    if (!done) {
-      outer:
-      for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-          if (canPlace(word.answer, r, c, word.dir)) {
-            place(word, r, c);
-            break outer;
-          }
-        }
-      }
-    }
-  }
-
-  let minR = size, minC = size, maxR = 0, maxC = 0;
-  for (const p of placements) {
-    for (let i = 0; i < p.answer.length; i++) {
-      const r = p.row + (p.dir === "down" ? i : 0);
-      const c = p.col + (p.dir === "across" ? i : 0);
-      minR = Math.min(minR, r);
-      minC = Math.min(minC, c);
-      maxR = Math.max(maxR, r);
-      maxC = Math.max(maxC, c);
-    }
-  }
-
-  const trimmedGrid = [];
-  for (let r = minR; r <= maxR; r++) {
-    const row = [];
-    for (let c = minC; c <= maxC; c++) {
-      row.push(grid[r][c]);
-    }
-    trimmedGrid.push(row);
-  }
-
-  const trimmedPlacements = placements.map(p => ({
-    ...p,
-    row: p.row - minR,
-    col: p.col - minC
-  }));
-
-  const numberMap = new Map();
-  let n = 1;
-  const sortedStarts = [...trimmedPlacements].sort((a, b) => {
-    if (a.row !== b.row) return a.row - b.row;
-    return a.col - b.col;
-  });
-
-  for (const p of sortedStarts) {
-    const key = `${p.row},${p.col}`;
-    if (!numberMap.has(key)) numberMap.set(key, n++);
-    p.displayNumber = numberMap.get(key);
-  }
-
-  return {
-    grid: trimmedGrid,
-    placements: trimmedPlacements,
-    across: trimmedPlacements.filter(p => p.dir === "across"),
-    down: trimmedPlacements.filter(p => p.dir === "down")
-  };
-}
-
-      const size = 24;
-      const grid = Array.from({ length: size }, () => Array.from({ length: size }, () => null));
-      const placements = [];
-
-      function inBounds(r, c) {
-        return r >= 0 && c >= 0 && r < size && c < size;
+    function normalizePuzzle(data) {
+      if (!data || !Array.isArray(data.words)) {
+        throw new Error("crossword.json must contain words[]");
       }
 
-      function canPlace(word, row, col, dir) {
-        const dr = dir === "down" ? 1 : 0;
-        const dc = dir === "across" ? 1 : 0;
+      const maxWords = getRequestedWordLimit();
 
-        for (let i = 0; i < word.length; i++) {
-          const r = row + dr * i;
-          const c = col + dc * i;
-          if (!inBounds(r, c)) return false;
-          const existing = grid[r][c];
-          if (existing !== null && existing !== word[i]) return false;
-        }
-        return true;
+      const words = data.words
+        .slice(0, maxWords)
+        .map(w => ({
+          answer: String(w.answer || "").toUpperCase(),
+          clue: String(w.clue || ""),
+          row: Number(w.row),
+          col: Number(w.col),
+          direction: String(w.direction || "").toLowerCase(),
+          number: Number(w.number)
+        }))
+        .filter(w =>
+          w.answer &&
+          (w.direction === "across" || w.direction === "down") &&
+          Number.isFinite(w.row) &&
+          Number.isFinite(w.col)
+        );
+
+      if (!words.length) {
+        throw new Error("No valid words found in crossword.json");
       }
 
-      function place(entry, row, col) {
-        const dr = entry.dir === "down" ? 1 : 0;
-        const dc = entry.dir === "across" ? 1 : 0;
+      let minRow = Infinity;
+      let minCol = Infinity;
+      let maxRow = -Infinity;
+      let maxCol = -Infinity;
 
-        for (let i = 0; i < entry.answer.length; i++) {
-          grid[row + dr * i][col + dc * i] = entry.answer[i];
-        }
-
-        placements.push({ ...entry, row, col });
-      }
-
-      const sorted = [...words].sort((a, b) => b.answer.length - a.answer.length);
-
-      if (sorted.length) {
-        const first = sorted[0];
-        const row = Math.floor(size / 2);
-        const col = Math.max(0, Math.floor((size - first.answer.length) / 2));
-        place(first, row, col);
-      }
-
-      for (let wi = 1; wi < sorted.length; wi++) {
-        const word = sorted[wi];
-        let done = false;
-
-        for (const p of placements) {
-          for (let i = 0; i < p.answer.length; i++) {
-            for (let j = 0; j < word.answer.length; j++) {
-              if (p.answer[i] !== word.answer[j]) continue;
-
-              let row, col;
-              if (p.dir === "across" && word.dir === "down") {
-                row = p.row - j;
-                col = p.col + i;
-              } else if (p.dir === "down" && word.dir === "across") {
-                row = p.row + i;
-                col = p.col - j;
-              } else {
-                continue;
-              }
-
-              if (canPlace(word.answer, row, col, word.dir)) {
-                place(word, row, col);
-                done = true;
-                break;
-              }
-            }
-            if (done) break;
-          }
-          if (done) break;
-        }
-
-        if (!done) {
-          outer:
-          for (let r = 0; r < size; r++) {
-            for (let c = 0; c < size; c++) {
-              if (canPlace(word.answer, r, c, word.dir)) {
-                place(word, r, c);
-                break outer;
-              }
-            }
-          }
+      for (const word of words) {
+        for (const cell of buildCellsForWord(word)) {
+          minRow = Math.min(minRow, cell.row);
+          minCol = Math.min(minCol, cell.col);
+          maxRow = Math.max(maxRow, cell.row);
+          maxCol = Math.max(maxCol, cell.col);
         }
       }
 
-      let minR = size, minC = size, maxR = 0, maxC = 0;
-      for (const p of placements) {
-        for (const cell of buildPlacementCells(p)) {
-          minR = Math.min(minR, cell.row);
-          minC = Math.min(minC, cell.col);
-          maxR = Math.max(maxR, cell.row);
-          maxC = Math.max(maxC, cell.col);
-        }
-      }
+      const rawRows = maxRow - minRow + 1;
+      const rawCols = maxCol - minCol + 1;
+      const requestedBoard = getRequestedBoardSize();
+      const rows = Math.max(rawRows, requestedBoard);
+      const cols = Math.max(rawCols, requestedBoard);
 
-      const trimmedGrid = [];
-      for (let r = minR; r <= maxR; r++) {
-        const row = [];
-        for (let c = minC; c <= maxC; c++) {
-          row.push(grid[r][c]);
-        }
-        trimmedGrid.push(row);
-      }
+      const rowOffset = Math.floor((rows - rawRows) / 2);
+      const colOffset = Math.floor((cols - rawCols) / 2);
 
-      const trimmedPlacements = placements.map(p => ({
-        ...p,
-        row: p.row - minR,
-        col: p.col - minC
+      const grid = Array.from({ length: rows }, () => Array.from({ length: cols }, () => null));
+
+      const placements = words.map(word => ({
+        ...word,
+        row: (word.row - minRow) + rowOffset,
+        col: (word.col - minCol) + colOffset,
+        dir: word.direction,
+        displayNumber: word.number
       }));
 
-      const numberMap = new Map();
-      let n = 1;
-      const sortedStarts = [...trimmedPlacements].sort((a, b) => {
-        if (a.row !== b.row) return a.row - b.row;
-        return a.col - b.col;
-      });
-
-      for (const p of sortedStarts) {
-        const key = `${p.row},${p.col}`;
-        if (!numberMap.has(key)) numberMap.set(key, n++);
-        p.displayNumber = numberMap.get(key);
+      for (const word of placements) {
+        const cells = buildCellsForWord(word);
+        for (let i = 0; i < cells.length; i++) {
+          grid[cells[i].row][cells[i].col] = word.answer[i];
+        }
       }
 
       return {
-        grid: trimmedGrid,
-        placements: trimmedPlacements,
-        across: trimmedPlacements.filter(p => p.dir === "across"),
-        down: trimmedPlacements.filter(p => p.dir === "down")
+        title: data.title || "Crossword",
+        grid,
+        placements,
+        across: placements.filter(p => p.dir === "across").sort((a, b) => a.number - b.number),
+        down: placements.filter(p => p.dir === "down").sort((a, b) => a.number - b.number)
       };
+    }
+
+    function buildUserGrid(grid) {
+      return grid.map(row => row.map(cell => (cell === null ? null : "")));
     }
 
     function getWordsAtCell(row, col) {
       return state.puzzle.placements.filter(p =>
-        buildPlacementCells(p).some(c => c.row === row && c.col === col)
+        buildCellsForWord(p).some(c => c.row === row && c.col === col)
       );
     }
 
     function getCellsForWord(word) {
-      return buildPlacementCells(word);
+      return buildCellsForWord(word);
     }
 
     function renderClues() {
@@ -679,8 +521,62 @@
           const word = state.puzzle.placements.find(p => p.dir === dir && p.number === number);
           if (!word) return;
           state.direction = dir;
-          selectCell(word.row, word.col);
+          selectCell(word.row, word.col, true);
         });
+      });
+    }
+
+    function attachCellEvents(input, r, c) {
+      input.addEventListener("focus", () => {
+        selectCell(r, c, false);
+      });
+
+      input.addEventListener("click", () => {
+        selectCell(r, c, false);
+      });
+
+      input.addEventListener("input", (e) => {
+        const letter = (e.target.value || "").toUpperCase().replace(/[^A-Z]/g, "");
+        e.target.value = letter;
+        state.userGrid[r][c] = letter;
+
+        if (letter) {
+          moveNext();
+        } else {
+          updateHighlighting();
+        }
+      });
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Backspace" && !e.target.value) {
+          e.preventDefault();
+          movePrev();
+          return;
+        }
+
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          moveToCell(r, c + 1);
+          return;
+        }
+
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          moveToCell(r, c - 1);
+          return;
+        }
+
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          moveToCell(r - 1, c);
+          return;
+        }
+
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          moveToCell(r + 1, c);
+          return;
+        }
       });
     }
 
@@ -688,9 +584,10 @@
       const gridEl = $("crosswordGrid");
       const rows = state.puzzle.grid.length;
       const cols = rows ? state.puzzle.grid[0].length : 0;
+      const cellSize = getCellSize(Math.max(rows, cols));
 
       gridEl.innerHTML = "";
-      gridEl.style.gridTemplateColumns = `repeat(${cols}, 42px)`;
+      gridEl.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
 
       const startMap = new Map();
       for (const p of state.puzzle.placements) {
@@ -700,41 +597,68 @@
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const answer = state.puzzle.grid[r][c];
+
           if (answer === null) {
             const black = document.createElement("div");
             black.className = "cell black";
+            black.style.width = `${cellSize}px`;
+            black.style.height = `${cellSize}px`;
             gridEl.appendChild(black);
             continue;
           }
 
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "cell";
-          btn.dataset.row = r;
-          btn.dataset.col = c;
+          const input = document.createElement("input");
+          input.type = "text";
+          input.inputMode = "text";
+          input.enterKeyHint = "next";
+          input.maxLength = 1;
+          input.className = "cell";
+          input.dataset.row = r;
+          input.dataset.col = c;
+          input.style.width = `${cellSize}px`;
+          input.style.height = `${cellSize}px`;
+          input.style.fontSize = cellSize <= 12 ? "9px" : cellSize <= 18 ? "12px" : cellSize <= 28 ? "16px" : "20px";
+          input.autocomplete = "off";
+          input.autocapitalize = "characters";
+          input.spellcheck = false;
+          input.value = state.userGrid[r][c] || "";
 
           const num = startMap.get(`${r},${c}`);
           if (num) {
+            const wrapper = document.createElement("div");
+            wrapper.style.position = "relative";
+            wrapper.style.width = `${cellSize}px`;
+            wrapper.style.height = `${cellSize}px`;
+
             const n = document.createElement("div");
             n.className = "cell-number";
             n.textContent = num;
-            btn.appendChild(n);
-          }
+            wrapper.appendChild(n);
 
-          btn.appendChild(document.createTextNode(state.userGrid[r][c] || ""));
-          btn.addEventListener("click", () => selectCell(r, c));
-          gridEl.appendChild(btn);
+            input.style.position = "absolute";
+            input.style.left = "0";
+            input.style.top = "0";
+            wrapper.appendChild(input);
+
+            attachCellEvents(input, r, c);
+            gridEl.appendChild(wrapper);
+          } else {
+            attachCellEvents(input, r, c);
+            gridEl.appendChild(input);
+          }
         }
       }
     }
 
     function updateHighlighting() {
-      rebuildGrid();
-
       if (!state.selected) {
         $("currentClue").textContent = "No clue selected.";
         return;
       }
+
+      document.querySelectorAll("#crosswordGrid .cell").forEach(cell => {
+        cell.classList.remove("word", "active", "crossword-cross");
+      });
 
       const activeWord = state.selected.word;
       const activeCells = new Set(getCellsForWord(activeWord).map(c => `${c.row},${c.col}`));
@@ -762,7 +686,7 @@
         `${activeWord.dir.toUpperCase()} ${activeWord.number}: ${activeWord.clue} (${activeWord.answer.length})`;
     }
 
-    function selectCell(row, col) {
+    function selectCell(row, col, focusInput = true) {
       const words = getWordsAtCell(row, col);
       if (!words.length) return;
 
@@ -770,6 +694,13 @@
       state.direction = match.dir;
       state.selected = { row, col, word: match };
       updateHighlighting();
+
+      if (focusInput) {
+        const input = document.querySelector(`#crosswordGrid input[data-row="${row}"][data-col="${col}"]`);
+        if (input && document.activeElement !== input) {
+          input.focus();
+        }
+      }
     }
 
     function moveToCell(row, col) {
@@ -779,14 +710,16 @@
         col >= state.puzzle.grid[0].length ||
         state.puzzle.grid[row][col] === null
       ) return;
-      selectCell(row, col);
+      selectCell(row, col, true);
     }
 
     function moveNext() {
       const cells = getCellsForWord(state.selected.word);
       const idx = cells.findIndex(c => c.row === state.selected.row && c.col === state.selected.col);
       if (idx >= 0 && idx < cells.length - 1) {
-        selectCell(cells[idx + 1].row, cells[idx + 1].col);
+        selectCell(cells[idx + 1].row, cells[idx + 1].col, true);
+      } else {
+        updateHighlighting();
       }
     }
 
@@ -794,7 +727,9 @@
       const cells = getCellsForWord(state.selected.word);
       const idx = cells.findIndex(c => c.row === state.selected.row && c.col === state.selected.col);
       if (idx > 0) {
-        selectCell(cells[idx - 1].row, cells[idx - 1].col);
+        selectCell(cells[idx - 1].row, cells[idx - 1].col, true);
+      } else {
+        updateHighlighting();
       }
     }
 
@@ -863,7 +798,19 @@
           }
         }
       }
+
+      const active = document.activeElement;
+      const activeRow = active?.dataset?.row;
+      const activeCol = active?.dataset?.col;
+
+      rebuildGrid();
       updateHighlighting();
+
+      if (activeRow != null && activeCol != null) {
+        const input = document.querySelector(`#crosswordGrid input[data-row="${activeRow}"][data-col="${activeCol}"]`);
+        if (input) input.focus();
+      }
+
       setStatus("Puzzle revealed.");
     }
 
@@ -874,7 +821,7 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
-        state.puzzle = createPuzzleFromJson(data);
+        state.puzzle = normalizePuzzle(data);
         state.userGrid = buildUserGrid(state.puzzle.grid);
 
         renderClues();
@@ -883,10 +830,10 @@
         if (state.puzzle.placements.length) {
           const first = state.puzzle.placements[0];
           state.direction = first.dir;
-          selectCell(first.row, first.col);
+          selectCell(first.row, first.col, true);
         }
 
-        setStatus("Puzzle loaded.");
+        setStatus(`Puzzle loaded. Board: ${getRequestedBoardSize()} x ${getRequestedBoardSize()} | Words: up to ${getRequestedWordLimit()}`);
       } catch (err) {
         setStatus(`Failed to load puzzle: ${err.message}`, true);
       }
